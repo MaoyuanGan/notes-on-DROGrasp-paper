@@ -71,7 +71,7 @@
 
 ## 2、机器人并非理所当然清楚自己的手是长什么样的
 
-一个基本的考虑在于，机器人手上的同一点所对应的特征向量的方向（排除光照强度等无关因素），在机器人手的不同构型下应该保持基本一致。否则，机器人对自己的手的感知就是虚假的，机器人其实根本不清楚自己的手是长什么样的。此时机器人手对机器人神经网络而言只是一个属性未知的外部实体，机器人根本不知道如何使用自己的手，机器人运用自己的手进行物体抓取的任务也就失去了实现的基础。<br>
+一个基本的考虑在于，机器人手上的同一点所对应的特征向量的方向（排除光照强度等无关因素干扰），在机器人手的不同构型下应该保持基本一致。否则，机器人对自己的手的感知就是虚假的，机器人其实根本不清楚自己的手是长什么样的。此时机器人手对机器人神经网络而言只是一个属性未知的外部实体，机器人根本不知道如何使用自己的手，机器人运用自己的手进行物体抓取的任务也就失去了实现的基础。<br>
 对于机器人手表面的某个采样点，可用 ![](https://latex.codecogs.com/svg.latex?i) 表示它在两个点云中的同一索引。对于同一个或另一个采样点，可用 ![](https://latex.codecogs.com/svg.latex?j) 表示它在两个点云中的同一索引。如果是同一个采样点则 ![](https://latex.codecogs.com/svg.latex?i=j) ，如果是另一个采样点则 ![](https://latex.codecogs.com/svg.latex?i\neq{}j) 。
 
 ## 3、对比损失函数 ![](https://latex.codecogs.com/svg.latex?\mathcal{L}_p)
@@ -89,3 +89,82 @@
 </p>
 
 ![](https://latex.codecogs.com/svg.latex?\left\langle\cdot,\cdot\right\rangle) 表示两个向量之间的余弦相似度，![](https://latex.codecogs.com/svg.latex?p_i^\mathcal{B}\in\mathbb{R}^3) 表示 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{B}\in\mathbb{R}^{N_\mathcal{R}\times{}3}) 中第 ![](https://latex.codecogs.com/svg.latex?i) 个点的坐标。在原论文中，设定 ![](https://latex.codecogs.com/svg.latex?\tau=0.1,\lambda=10) 。
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)">
+</p>
+
+计算的是点 ![](https://latex.codecogs.com/svg.latex?i) 在抓取构型下的特征向量 ![](https://latex.codecogs.com/svg.latex?\phi_i^\mathcal{A}\in\mathbb{R}^D) 与点 ![](https://latex.codecogs.com/svg.latex?j) 在张开构型下的特征向量 ![](https://latex.codecogs.com/svg.latex?\phi_j^\mathcal{B}\in\mathbb{R}^D) 的距离加权相似度。
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\frac{\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)}{\sum_j\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)}\in\left(0,1\right)">
+</p>
+
+计算的是
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\omega_{ii}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)=\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)">
+</p>
+
+在
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\omega_{i1}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_1^\mathcal{B}\right\rangle/\tau\right),\omega_{i2}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_2^\mathcal{B}\right\rangle/\tau\right),\cdots,\omega_{ii}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)=\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right),\cdots,\omega_{iN_\mathcal{R}}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_{N_\mathcal{R}}^\mathcal{B}\right\rangle/\tau\right)">
+</p>
+
+当中所占的比例。为了让点 ![](https://latex.codecogs.com/svg.latex?i) 所对应的特征向量的方向在机器人手的抓取、张开构型下保持基本一致，点云编码器 ![](https://latex.codecogs.com/svg.latex?f_{\theta_\mathcal{R}}(\cdot)) 需要让该比例（本质上就是模型所估计的似然）尽可能变大。<br>
+于是，可以将该比例的负对数（即负对数似然）用作一个损失项，即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\mathcal{L}_{p_i}=-\log\left[\frac{\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)}{\sum_j\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)}\right],">
+</p>
+
+迫使点云编码器降低该损失项的值的同时，就实现了原比例的增长。<br>
+损失项 ![](https://latex.codecogs.com/svg.latex?\mathcal{L}_{p_i}) 是针对于单个点 ![](https://latex.codecogs.com/svg.latex?i) 而言的。将所有点 ![](https://latex.codecogs.com/svg.latex?1,2,\cdots,N_\mathcal{R}) 各自对应的损失项相加，并除以机器人手连杆数 ![](https://latex.codecogs.com/svg.latex?N_\ell) ，就得到了连杆级平均损失（注意并非除以 ![](https://latex.codecogs.com/svg.latex?N_\mathcal{R}) ，并非点级平均损失），即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\begin{align*}\mathcal{L}_p&=\frac{1}{N_\ell}\sum_i\mathcal{L}_{p_i}\\&=\frac{1}{N_\ell}\sum_i\left[-\log\left[\frac{\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)}{\sum_j\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)}\right]\right]\\&=-\frac{1}{N_\ell}\sum_i\log\left[\frac{\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)}{\sum_j\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)}\right].\end{align*}">
+</p>
+
+## 4、距离权重 ![](https://latex.codecogs.com/svg.latex?\omega_{ij})
+
+对于两个不同的点 ![](https://latex.codecogs.com/svg.latex?i) 和 ![](https://latex.codecogs.com/svg.latex?j) ，在标准构型下，如果它们距离较近，那么它们会具有相似的几何邻域，进而意味着相似的语义信息。因此，对于相距较近的两点的特征向量，它们的方向本就应该是接近的，它们的余弦相似度本就应该较大。这种“近距近特征”的自然性质不应该遭受严苛的梯度惩罚。然而，余弦相似度 ![](https://latex.codecogs.com/svg.latex?\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle) 出现在似然比例的分母中，这意味着当它增大时，![](https://latex.codecogs.com/svg.latex?\mathcal{L}_p) 会增大，进而招致梯度惩罚压力，限制其增大。<br>
+为了适度缓解这种梯度惩罚压力，引入距离权重
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\omega_{ij}=\frac{\tanh\left(\lambda\left\lVert{}p_i^\mathcal{B}-p_j^\mathcal{B}\right\rVert_2\right)}{\tanh\left(\max\left(\lambda\left\lVert{}p_i^\mathcal{B}-p_j^\mathcal{B}\right\rVert_2\right)\right)}\in\left(0,1\right),">
+</p>
+
+此处 ![](https://latex.codecogs.com/svg.latex?i\neq{}j) 。当点 ![](https://latex.codecogs.com/svg.latex?i) 与点 ![](https://latex.codecogs.com/svg.latex?j) 相距较近时，![](https://latex.codecogs.com/svg.latex?\omega_{ij}) 较小，与 ![](https://latex.codecogs.com/svg.latex?\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)) 相乘后，乘积结果 ![](https://latex.codecogs.com/svg.latex?\omega_{ij}\exp\left(\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle/\tau\right)) 作为新的分母项，使分母整体减小，进而使 ![](https://latex.codecogs.com/svg.latex?\mathcal{L}_p) 减小，缓解了限制 ![](https://latex.codecogs.com/svg.latex?\left\langle\phi_i^\mathcal{A},\phi_j^\mathcal{B}\right\rangle) 增大的梯度惩罚压力。<br>
+![](https://latex.codecogs.com/svg.latex?\exp\left(\left\langle\phi_i^\mathcal{A},\phi_i^\mathcal{B}\right\rangle/\tau\right)) 本身既作为分子，又需要直接作为分母中的项，维持似然比例恒不大于 ![](https://latex.codecogs.com/svg.latex?1) 的数学性质。倘若将其与一个小于 ![](https://latex.codecogs.com/svg.latex?1) 的因子相乘，那么就会存在分母小于分子（比例大于 ![](https://latex.codecogs.com/svg.latex?1) ）的可能，进而存在 ![](https://latex.codecogs.com/svg.latex?\mathcal{L}_p<0) 的可能，整个模型的预训练直接朝着错误方向崩溃。因此，当 ![](https://latex.codecogs.com/svg.latex?i=j) 时，![](https://latex.codecogs.com/svg.latex?\omega_{ij}) 必须设置为 ![](https://latex.codecogs.com/svg.latex?1) 。
+<br><br><br><br><br><br><br><br><br><br>
+
+# 未来抓取位姿下的点对点预测距离
+
+给定机器人手腕部的位姿（随机生成或者用户指定），可以唯一确定对应的初始张开构型，记为 ![](https://latex.codecogs.com/svg.latex?q_\text{init}\in\mathbb{R}^{N_\text{DoF}}) 。在机器人手每一段连杆的表面上均匀地采样，得到采样点云
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\{\mathbf{P}_{\ell_i}\}_{i=1}^{N_\ell}.">
+</p>
+
+绝对坐标点云即为
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{R}=\text{FK}\left(q_\text{init},\{\mathbf{P}_{\ell_i}\}_{i=1}^{N_\ell}\right)\in\mathbb{R}^{N_\mathcal{R}\times{}3},">
+</p>
+
+后文中将其称为机器人手点云。<br>
+待抓取物体的点云记为 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{O}\in\mathbb{R}^{N_\mathcal{O}\times{}3}) ，其中 ![](https://latex.codecogs.com/svg.latex?N_\mathcal{O}) 在原论文中设定为 ![](https://latex.codecogs.com/svg.latex?512) 。后文中将其称为物体点云。<br>
+机器人手点云与物体点云在同一个原点坐标系中。接下来，神经网络需要预测出：在未来的抓取构型下，机器人手点云中任意一点与物体点云中任意一点的距离。<br>
+这 ![](https://latex.codecogs.com/svg.latex?N_\mathcal{R}\times{}N_\mathcal{O}) 个距离预测值由点对点预测距离矩阵 ![](https://latex.codecogs.com/svg.latex?\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)\in\mathbb{R}^{N_\mathcal{R}\times{}N_\mathcal{O}}) 表征。
+
+## 1、提取点级特征
+
+引入机器人手点云编码器 ![](https://latex.codecogs.com/svg.latex?f_{\theta_\mathcal{R}}(\cdot)) 以及物体点云编码器 ![](https://latex.codecogs.com/svg.latex?f_{\theta_\mathcal{O}}(\cdot)) ，它们架构相同，参数独立。其中，机器人手点云编码器 ![](https://latex.codecogs.com/svg.latex?f_{\theta_\mathcal{R}}(\cdot)) 用构型无关化预训练参数进行初始化，并在训练过程中保持冻结。<br>
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\begin{align*}\phi^\mathcal{R}&=f_{\theta_\mathcal{R}}\left(\mathbf{P}^\mathcal{R}\right)\in\mathbb{R}^{N_\mathcal{R}\times{}D},\\{}\phi^\mathcal{O}&=f_{\theta_\mathcal{O}}\left(\mathbf{P}^\mathcal{O}\right)\in\mathbb{R}^{N_\mathcal{O}\times{}D},\end{align*}">
+</p>
+
+其中，![](https://latex.codecogs.com/svg.latex?\phi^\mathcal{R}\in\mathbb{R}^{N_\mathcal{R}\times{}D}) 对机器人手点云 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{R}\in\mathbb{R}^{N_\mathcal{R}\times{}3}) 的语义信息进行了编码（提取了每个点的特征向量），![](https://latex.codecogs.com/svg.latex?\phi^\mathcal{O}\in\mathbb{R}^{N_\mathcal{O}\times{}D}) 对物体点云 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{O}\in\mathbb{R}^{N_\mathcal{O}\times{}3}) 的语义信息进行了编码。<br>
+然而，这两个点级特征矩阵目前是孤立的，并未编码自己与对方的关系信息。为了让点级特征矩阵所编码的信息更加完备，从而支撑起手-物交互场景下的可靠预测，遂引入机器人-物体交叉注意力函数 ![](https://latex.codecogs.com/svg.latex?g_{\theta_\mathcal{R}}\left(\cdot,\cdot\right)) 以及物体-机器人交叉注意力函数 ![](https://latex.codecogs.com/svg.latex?g_{\theta_\mathcal{O}}\left(\cdot,\cdot\right)) 。
