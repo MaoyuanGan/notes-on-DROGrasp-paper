@@ -275,3 +275,83 @@
 </p>
 
 ![](https://latex.codecogs.com/svg.latex?\left[\boldsymbol{q}_{\text{min}},\boldsymbol{q}_{\text{max}}\right]) 表示关节限位区间，![](https://latex.codecogs.com/svg.latex?\varepsilon_q=0.5) 表示最大允许步长。
+<br><br><br><br><br><br><br><br><br><br>
+
+# 损失函数 ![](https://latex.codecogs.com/svg.latex?\mathcal{L})
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\begin{align*}\mathcal{L}=&\lambda_\mathcal{D}\mathcal{L}_{\text{L1}}\left(\mathcal{D}\left(\mathcal{R},\mathcal{O}\right),\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)^\text{GT}\right)\\&+\lambda_\mathcal{T}\frac{1}{N_\ell}\sum_{i=1}^{N_\ell}\mathcal{L}_{\ell_i}\\&+\lambda_\mathcal{P}\left\lvert\mathcal{L}_\mathbf{P}\left(\mathbf{P}^\mathcal{T},\mathbf{P}^\mathcal{O}\right)\right\rvert\\&+\lambda_{KL}\mathcal{D}_{KL}\left(f_{\theta_\mathcal{G}}\left(\mathbf{P}^\mathcal{G},\boldsymbol{\psi}^\mathcal{R},\boldsymbol{\psi}^\mathcal{O}\right)\,\|\;\mathcal{N}\left(0,I\right)\right),\end{align*}">
+</p>
+
+其中 ![](https://latex.codecogs.com/svg.latex?\lambda_\mathcal{D},\lambda_\mathcal{T},\lambda_\mathcal{P},\lambda_{KL}) 为各损失项的尺度缩放超参数。
+
+## 1、距离预测损失
+
+![](https://latex.codecogs.com/svg.latex?\text{GT})（Ground Truth）意为真实值标注，即训练数据集当中的标签。神经网络预测的抓取构型下点对点距离矩阵 ![](https://latex.codecogs.com/svg.latex?\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)\in\mathbb{R}^{N_\mathcal{R}\times{}N_\mathcal{O}}) ，与训练数据集当中标注的、经过实际测量的抓取构型下点对点距离矩阵 ![](https://latex.codecogs.com/svg.latex?\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)^\text{GT}\in\mathbb{R}^{N_\mathcal{R}\times{}N_\mathcal{O}}) 的偏差值的一范数
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\begin{align*}\mathcal{L}_{\text{L1}}\left(\mathcal{D}\left(\mathcal{R},\mathcal{O}\right),\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)^{\text{GT}}\right)=\sum_{i=1}^{N_\mathcal{R}}\sum_{j=1}^{N_\mathcal{O}}\left\lVert\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)_{ij}-\mathcal{D}\left(\mathcal{R},\mathcal{O}\right)_{ij}^\text{GT}\right\rVert_1\end{align*}">
+</p>
+
+作为损失项，驱动神经网络预测出准确的点对点距离。
+
+## 2、位姿预测损失
+
+在
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\mathcal{L}_{\ell_i}=\left\lVert\mathbf{x}_i^*-\mathbf{x}_i^\text{GT}\right\rVert_2+\text{arccos}\left(\frac{\text{tr}\left(\mathbf{R}_i^{*^\top}\mathbf{R}_i^\text{GT}\right)-1}{2}\right)">
+</p>
+
+当中，3D平移预测损失由 ![](https://latex.codecogs.com/svg.latex?\left\lVert\mathbf{x}_i^*-\mathbf{x}_i^\text{GT}\right\rVert_2) 构成，驱动神经网络对任意连杆均预测出准确的3D平移。3D旋转预测损失则由
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\begin{align*}\text{arccos}\left(\frac{\text{tr}\left(\mathbf{R}_i^{*^\top}\mathbf{R}_i^\text{GT}\right)-1}{2}\right)&=\text{arccos}\left(\frac{\text{tr}\left(\mathbf{R}_{rel_i}\right)-1}{2}\right)\\&=\text{arccos}\left(\frac{\left(1+2\cos\theta_{rel_i}\right)-1}{2}\right)\\&=\text{arccos}\left(\cos\theta_{rel_i}\right)\\&=\theta_{rel_i}\end{align*}">
+</p>
+
+构成。<br>
+由于 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\in\mathbb{R}^{3\times{}3}) 与 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^\text{GT}\in\mathbb{R}^{3\times{}3}) 之间存在偏差，所以从 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\in\mathbb{R}^{3\times{}3}) 到 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^\text{GT}\in\mathbb{R}^{3\times{}3}) 需要经过一定旋转。设相对旋转矩阵为 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}\in\mathbb{R}^{3\times{}3}) ，那么就有 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\cdot\mathbf{R}_{rel_i}=\mathbf{R}_i^\text{GT}) ，从而解得 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}=\mathbf{R}_i^{*^\top}\mathbf{R}_i^\text{GT}) 。<br>
+设 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}\in\mathbb{R}^{3\times{}3}) 的旋转角为 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}\in\left[0,\pi\right]) ，则从 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\in\mathbb{R}^{3\times{}3}) 到 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^\text{GT}\in\mathbb{R}^{3\times{}3}) 所旋转的角度即为 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}) 。<br>
+倘若从 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\in\mathbb{R}^{3\times{}3}) 到 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^\text{GT}\in\mathbb{R}^{3\times{}3}) 需要旋转一个大于 ![](https://latex.codecogs.com/svg.latex?180^\circ) 的角度 ![](https://latex.codecogs.com/svg.latex?\theta) ，则在旋转平面上反方向旋转小于 ![](https://latex.codecogs.com/svg.latex?180^\circ) 的角度 ![](https://latex.codecogs.com/svg.latex?360^\circ-\theta) ，可以达成同样的效果。因此，规定旋转角 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}) 的范围是 ![](https://latex.codecogs.com/svg.latex?\left[0,\pi\right]) 。<br>
+由于 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}\in{}SO(3)) ，![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}) 与 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}) 之间其实存在一个恒成立的关系式，即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\text{tr}\left(\mathbf{R}_{rel_i}\right)=1+2\cos\theta_{rel_i},">
+</p>
+
+因此可以通过 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}) 反解出 ![](https://latex.codecogs.com/svg.latex?\cos\theta_{rel_i}) ，即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\cos\theta_{rel_i}=\frac{\text{tr}\left(\mathbf{R}_{rel_i}\right)-1}{2},">
+</p>
+
+进而反解出 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}) ，即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\theta_{rel_i}=\text{arccos}\left(\frac{\text{tr}\left(\mathbf{R}_{rel_i}\right)-1}{2}\right),">
+</p>
+
+代回 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_{rel_i}=\mathbf{R}_i^{*^\top}\mathbf{R}_i^\text{GT}) ，即得
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\theta_{rel_i}=\text{arccos}\left(\frac{\text{tr}\left(\mathbf{R}_i^{*^\top}\mathbf{R}_i^\text{GT}\right)-1}{2}\right).">
+</p>
+
+正实数弧度值 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}\in\left[0,\pi\right]) 直接度量了 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^*\in\mathbb{R}^{3\times{}3}) 与 ![](https://latex.codecogs.com/svg.latex?\mathbf{R}_i^\text{GT}\in\mathbb{R}^{3\times{}3}) 之间的3D偏差角，是3D旋转矩阵之间最可信的偏差指标。将 ![](https://latex.codecogs.com/svg.latex?\theta_{rel_i}) 作为平均损失项
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\frac{1}{N_\ell}\sum_{i=1}^{N_\ell}\mathcal{L}_{\ell_i}">
+</p>
+
+的构成部分，可驱动神经网络对各段连杆同时预测出准确的3D旋转矩阵。
+
+## 3、点云穿透损失
+
+在仿真训练环境里，当机器人手执行完毕抓取构型 ![](https://latex.codecogs.com/svg.latex?\boldsymbol{q}^*\in\mathbb{R}^{N_\text{DoF}}) 之后，对机器人手点云进行测量。测量结果记为 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{T}\in\mathbb{R}^{N_\mathcal{R}\times{}3}) 。<br>
+在仿真训练环境中，最终抓取状态下的机器人手可能穿透到物体内部。为了对这种违背物理事实的现象施加惩罚，引入 ![](https://latex.codecogs.com/svg.latex?\left\lvert\mathcal{L}_\mathbf{P}\left(\cdot,\cdot\right)\right\rvert) 绝对值函数，它接受 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{T}\in\mathbb{R}^{N_\mathcal{R}\times{}3}) 与 ![](https://latex.codecogs.com/svg.latex?\mathbf{P}^\mathcal{O}\in\mathbb{R}^{N_\mathcal{O}\times{}3}) 作为输入，按照一定计算规则，输出一个正实数，即
+
+<p align="center">
+<img src="https://latex.codecogs.com/svg.latex?\left\lvert\mathcal{L}_\mathbf{P}\left(\mathbf{P}^\mathcal{T},\mathbf{P}^\mathcal{O}\right)\right\rvert.">
+</p>
+
+这个正实数是机器人手对物体穿透程度的量化结果，将其作为损失项，可防止神经网络预测出导致穿模的抓取构型。
